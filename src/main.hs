@@ -153,6 +153,47 @@ parseEffectDeclarationBlock = do
   many parseSingleEffectDeclaration
 
 
+----------------------------------------------------Statements---------------------------------------------------------------------------------------
+data IntExp = Identifier Token
+              |Expression (Char, Token,Token)
+
+
+binaryOperation:: Parser (Char, Token, Token)
+binaryOperation = do
+  a<-parseIdentifier
+  b<-parseBinOp
+  c<-parseIdentifier
+  return (Char, Token, Token)
+
+intExp :: Parser IntExp
+intExp = do
+  a <- parseIdentifier
+       <|>parseIdentifier
+       b <- parseBinOp
+       c <- parseIdentifier
+       <|>intExp
+    
+  return $ case c of
+    Identifier -> (b,a,c)
+
+parseBinOp :: Parser Char
+parseBinOp = do
+  a<-char '+'
+      <|>char '+'
+      <|>char '-'
+      <|>char '*'
+      <|>char '/'
+      <|>char '%'
+  return a
+
+assignExpr
+assignExpr = do
+  a<- parseIdentifier
+  b<- char '='
+  c<- parseIdentifier
+  <|> intExp
+  return 
+
 ----------------------------------vvvvv------Managemnet Function vvvv---------------------------------------------------------------------------------
 
 
