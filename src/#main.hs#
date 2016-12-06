@@ -78,10 +78,9 @@ parseKeyword = try parseDatatype
                <|>try parseModuleKeyword
                <|>try parseSignalKeyword
                <|>parseBoolLit
-------------------------------------------tokens--------------------------------------------
-spaces :: Parser()
-spaces = skipMany1 space
 
+
+-----------------------------------------Values---------------------------------------------
 parseNumber:: Parser Value
 parseNumber = liftM ( Number . read ) $ many1(digit)
 
@@ -91,6 +90,12 @@ parseStringLiteral = do
   a<- many letter<|>digit<|>symbol
   char '"'
   return $ StringLit a
+
+
+------------------------------------------tokens--------------------------------------------
+spaces :: Parser()
+spaces = skipMany1 space
+
                  
 
 parseToken::Parser Token
@@ -105,6 +110,8 @@ program = do
   spaces
   parseIdentifier
   spaces
+  newline
+  
   string ":"
   return ()
 -------------------------Larger parsing structures. ---------------------------------
