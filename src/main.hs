@@ -6,98 +6,64 @@ symbol :: Parser Char
 symbol = oneOf "+-*/%"
 
 
-data Value = Number Integer
-           |Bool Bool
-           |StringLit String
+data IntExpr = Number Integer
+               |IntVar String
+               |IntBinaryExpression Char IntExpr IntExpr
 
-data Token =  Identifier String 
-             |DatatypeKeyword String
-             |ModuleKeyword String
-             |SignalKeyword String
-             |EntityKeyword String
-             |EffectKeyword String
+data BoolExpr = BoolLiteral Bool
+               |BoolVar String
+               |BoolBinaryExpression String IntExpr IntExpr
+                
+data Expr = IntExpr
+            |BoolExpr
+
+data AssignStmt = BoolAssignExpr String BoolExpr
+                |IntAssignLiteral String IntExpr
+                
+
+data Token = DatatypeKeyword String
              
 showToken :: Token -> String
-showToken (Identifier a) = show a
-showToken (Bool a) = show a
 showToken (Number a) = show a
-showToken (DatatypeKeyword a) = "Token type"
-showToken (ModuleKeyword a) = "ModuleToken"
-showToken (SignalKeyword a) = "SignalToken"
-showToken (EntityKeyword a) = "Entity"
-showToken (EffectKeyword a) = "Effect"
 
 instance Show Token where show = showToken
 
-parseIdentifier::Parser Token
+parseIdentifier::Parser String
 parseIdentifier = do
   first <- letter
   rest <- many (letter  <|> digit)
   let a = first:rest
-  return $ Identifier a
+  return a
 
-parseBoolLit::Parser Value
+parseBoolLit::Parser BoolExpr
 parseBoolLit = do
    a <- string "false" <|> string "true"
    return $ case a of
-     "true" -> Bool True
-     "false" -> Bool False
+     "true" -> BoolLiteral True
+     "false" -> BoolLiteral False
 
 parseDatatype::Parser Token
 parseDatatype = do
   a <- string "int" 
        <|> string "string"<|>
         string "bool"
-  return $  DatatypeKeyword a
-
-parseModuleKeyword::Parser Token
-parseModuleKeyword = do
-  a<-string "module"
-  return $ ModuleKeyword a
-  
-parseSignalKeyword::Parser Token
-parseSignalKeyword = do
-  a<-string "signal"
-  return $ SignalKeyword a
-
-parseEntityKeyword::Parser Token
-parseEntityKeyword = do
-  a<-string "entity"
-  return $ EntityKeyword a
-
-parseEffectKeyword::Parser Token
-parseEffectKeyword = do
-  a<-string "effect"
-  return $ EntityKeyword a
+  return $ DatatypeKeyword a
 
 
-parseKeyword :: Parser Token
-parseKeyword = try parseDatatype
-               <|>try parseEntityKeyword
-               <|>try parseEffectKeyword
-               <|>try parseModuleKeyword
-               <|>try parseSignalKeyword
-               <|>parseBoolLit
 ------------------------------------------tokens--------------------------------------------
 spaces :: Parser()
 spaces = skipMany1 space
 
-parseNumber:: Parser Value
-parseNumber = liftM ( Number . read ) $ many1(digit)
+parseNumber:: Parser Integer
+parseNumber = liftM (Number . read ) $ many1(digit)
 
-parseStringLiteral :: Parser Value
+parseStringLiteral :: Parser String
 parseStringLiteral = do
   char '"'
   a<- many letter<|>digit<|>symbol
   char '"'
-  return $ StringLit a
+  return $ a
                  
-
-parseToken::Parser Token
-parseToken = parseKeyword
-  <|>parseIdentifier
-  <|>parseNumber
-  
 
 program::Parser()
 program = do
@@ -106,6 +72,12 @@ program = do
   parseIdentifier
   spaces
   string ":"
+  newline
+  many parseVarDeclaration
+  parseSignalDeclarationBlock
+  many parseEntityDeclaration
+  string "Effects:"
+  parseEffectDeclarationBlock
   return ()
 -------------------------Larger parsing structures. ---------------------------------
 parseIdList::Parser [Token]
@@ -121,16 +93,16 @@ parseVarDeclaration = do
   
 parseEntityDeclaration::Parser (String, [Token])
 parseEntityDeclaration = do
-  entity <- parseEntityKeyword
+  string "entity"
   spaces
   list <- parseIdList
   newline
-  return (show entity,list)
+  return (show "entity",list)
 
 
-parseSingleSignalDeclaration :: Parser (Token,Token, Token, Token)
+parseSingleSignalDeclaration :: Parser (String, String, String,String )
 parseSingleSignalDeclaration = do
-  parseSignalKeyword
+  string "signal"
   spaces
   sType <- parseDatatype
   char '|'
@@ -142,14 +114,14 @@ parseSingleSignalDeclaration = do
   newline
   return (sType, sName, sExe,sHandler)
 
-parseSignalDeclarationBlock::Parser [(Token, Token,Token,Token)]
+parseSignalDeclarationBlock::Parser [(String, String,String,String)]
 parseSignalDeclarationBlock = do
   many parseSingleSignalDeclaration
 
 
-parseSingleEffectDeclaration :: Parser (Token, Token, Token)
+parseSingleEffectDeclaration :: Parser (String, String, String)
 parseSingleEffectDeclaration = do
-  parseEffectKeyword
+  string "effect"
   spaces
   eName <- parseIdentifier
   char '|'
@@ -159,32 +131,26 @@ parseSingleEffectDeclaration = do
   newline
   return (eName, eExe,sEntity)
 
-parseEffectDeclarationBlock::Parser [(Token,Token,Token)]
+parseEffectDeclarationBlock::Parser [(String,String,String)]
 parseEffectDeclarationBlock = do
   many parseSingleEffectDeclaration
 
 
 ----------------------------------------------------Statements---------------------------------------------------------------------------------------
-data IntExp = IntIdentifier Token
-              |IntExpression Char Token Token
 
-data LogicalExp = LogicalIdentifier Token
-                  |LogicalExpression String Token Token
-
-data Expr = LogicalExpr
-parseLogicalOperation:: Parser LogicalExp
+parseLogicalOperation:: Parser BoolExpr
 parseLogicalOperation = do
   a<-parseIdentifier
   b<-parseLogicalOp
   c<-parseIdentifier
-  return $ LogicalExpression b a c
+  return $ BoolBinaryExpression b a c
 
-parseIntExp :: Parser IntExp
+parseIntExp :: Parser IntExpr
 parseIntExp = do
   a <- parseIdentifier
   b <-  parseBinOp
   c <- parseIdentifier
-  return $ IntExpression b a c
+  return $ IntBinaryExpression b a c
 
 
 parseBinOp :: Parser Char
@@ -202,12 +168,12 @@ parseLogicalOp = do
   a<-string "&&"
       <|>string "||"
   return a
-data AssignExpr = Expr1 Token Token
-                  |BoolAssignExpr Token LogicalExp
-                  |IntAssignExpr Token IntExp
 
+parseExpr :: Parser Expr
+parseExpr = do
+  try parseIntExp <|> parse
 
-assignExpr :: Parser AssignExpr
+assignExpr :: Parser AssignStmt
 assignExpr = do
   a<- parseIdentifier
   b<- char '='
