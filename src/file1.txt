@@ -1,0 +1,15 @@
+module a :
+int a,b,c
+bool e,f
+signal int|sone|exeone|handlerone
+signal int|stwo|exetwo|handlerone
+Effects:
+effect eone|eoneexe on eoneentity
+effect etwo|etwoexe on eoneentity
+effect ethree|ethreexe on eoneentity
+Handlers:
+Conditions:
+Situations:
+when b=c eone@sone
+when b=c eone@sone
+
